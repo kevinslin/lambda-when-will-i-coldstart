@@ -17,12 +17,12 @@ let invokeTarget = co.wrap(function* (target) {
     throw new Error(res.Payload);
   }
 
-  return JSON.parse(res.Payload);  
+  return JSON.parse(res.Payload);
 });
 
 // expect `input` to be of shape:
 // { "target": "string (lambda function to invoke)",
-//   "interval": "int (seconds)", 
+//   "interval": "int (seconds)",
 //   "coldstarts": "int (no. of consecutive coldstarts)" }
 module.exports.handler = co.wrap(function* (input, context, callback) {
   console.log(input);
@@ -45,7 +45,7 @@ module.exports.handler = co.wrap(function* (input, context, callback) {
 
     output.interval = input.interval + 60;
     output.coldstarts = 0;
-    
+
     callback(null, output);
   }
 });

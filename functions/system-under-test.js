@@ -1,13 +1,10 @@
 'use strict';
-
-const co         = require('co');
-const Promise    = require('bluebird');
 const AWS        = require('aws-sdk');
-const cloudwatch = Promise.promisifyAll(new AWS.CloudWatch());
+const cloudwatch = new AWS.CloudWatch({region: 'us-west-2'})
 
 let isColdstart = false;
 
-let trackColdstart = co.wrap(function* (funcName) {
+let trackColdstart = async (funcName) => {
   let req = {
     MetricData: [
       {
@@ -18,19 +15,18 @@ let trackColdstart = co.wrap(function* (funcName) {
         Value: 1
       }
     ],
-    Namespace: "theburningmonk.com"
+    Namespace: "ColdstartTest"
   };
-  yield cloudwatch.putMetricDataAsync(req);
-});
+  return cloudwatch.putMetricData(req).promise();
+}
 
-module.exports.handler = co.wrap(function* (event, context, callback) {
+module.exports.handler = async (event, context, callback) => {
   if (!isColdstart) {
     isColdstart = true;
-    console.log("this is a coldstart");
-    yield trackColdstart(context.functionName);
-
+    let cwRes = await trackColdstart(context.functionName);
+    console.log({cwRes});
     callback(null, { isColdstart : true });
+  } else {
+    callback(null, { isColdstart : false });
   }
-
-  callback(null, { isColdstart : false });
-});
+}

@@ -1,0 +1,32 @@
+{
+  "Comment": "How long AWS Lambda keeps idle functions around?",
+  "StartAt": "FindIdleTimeout",
+  "States": {
+    "FindIdleTimeout": {
+      "Type": "Task",
+      "Resource": "{ARN_OF_FIND_IDLE_TIMEOUT_FUNCTION}",
+      "Next": "RepeatOrNot"
+    },
+    "RepeatOrNot": {
+      "Type" : "Choice",
+      "Choices": [
+        {
+          "Variable": "$.coldstarts",
+          "NumericEquals": 10,
+          "Next": "Done"
+        }
+      ],
+      "Default": "Wait"
+    },
+
+    "Wait": {
+      "Type": "Wait",
+      "SecondsPath": "$.interval",
+      "Next": "FindIdleTimeout"
+    },
+
+    "Done": {
+      "Type" : "Succeed"
+    }
+  }
+}

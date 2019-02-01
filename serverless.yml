@@ -2,14 +2,12 @@ service: when-will-i-coldstart
 
 provider:
   name: aws
-  runtime: nodejs6.10
-
-# you can overwrite defaults here
+  runtime: nodejs8.10
   stage: dev
   region: us-east-1
+  profile: linkevi
 
-# you can add statements to the Lambda function's IAM Role here
-  iamRoleStatements:  
+  iamRoleStatements:
     - Effect: "Allow"
       Action:
         - "lambda:InvokeFunction"
@@ -51,6 +49,38 @@ functions:
   system-under-test-1536:
     handler: functions/system-under-test.handler
     memorySize: 1536
-  
+
+  system-under-test-1792:
+    handler: functions/system-under-test.handler
+    memorySize: 1792
+
+  system-under-test-1856:
+    handler: functions/system-under-test.handler
+    memorySize: 1856
+
+  system-under-test-2048:
+    handler: functions/system-under-test.handler
+    memorySize: 2048
+
+  system-under-test-2240:
+    handler: functions/system-under-test.handler
+    memorySize: 2240
+
+  system-under-test-2432:
+    handler: functions/system-under-test.handler
+    memorySize: 2432
+
+  system-under-test-2624:
+    handler: functions/system-under-test.handler
+    memorySize: 2624
+
+  system-under-test-2816:
+    handler: functions/system-under-test.handler
+    memorySize: 2816
+
+  system-under-test-3008:
+    handler: functions/system-under-test.handler
+    memorySize: 3008
+
   find-idle-timeout:
     handler: functions/find-idle-timeout.handler
