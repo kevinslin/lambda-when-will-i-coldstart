@@ -30,9 +30,9 @@ function _MemFromCwId(label) {
   return parseInt(label.split("-").slice(-2, -1))
 }
 
-function writeCsv({ path, data}) {
-  log.info({ctx: "writeCsv", path})
-  log.info({data})
+function writeCsv({ path, data }) {
+  log.info({ ctx: "writeCsv", path })
+  log.info({ data })
   let writer = csvWriter()
   writer.pipe(fs.createWriteStream(path))
   data.forEach(line => {
@@ -179,27 +179,8 @@ async function main() {
     log.info(derived)
     results = _.concat(results, derived)
   })
-  writeCsv({path: "/tmp/out.csv", data: results})
+  writeCsv({ path: "/tmp/out.csv", data: results })
   log.info("done")
-
-  //let {MetricDataResults} = data
-  //log.info({results: JSON.stringify(MetricDataResults)});
-
-  //let data = fs.readFileSync('./fixtures/sample-response.json', 'utf8')
-  //data = JSON.parse(data)
-  //let startTime = '2019-01-27T03:56:00.000Z"'
-  //startTime = moment("2019-01-27T03:56:00.000Z")
-  //log.info({startTime});
-  //let derived = analyzeData({data, startTime})
 }
 
 main()
-//try {
-//let out = writeCsv({path: "/tmp/out.csv", data: [
-  //{a:1, b:2},
-  //{a:1, b:2},
-//]})
-//} catch(err) {
-  //log.error(err)
-//}
-//log.info("done")

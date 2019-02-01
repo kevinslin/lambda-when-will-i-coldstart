@@ -30,7 +30,8 @@ node analysis/run.js| bunyan
 FUNCTION_SUFFIX={YOUR_LAMBDA_SUFFIX}
 ```
 
-- run results
+- run results (by default, output is stored in `/tmp/out.csv`)
 ```
 node analysis/gatherResults.js| bunyan
 ```
+
