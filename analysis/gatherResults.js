@@ -1,4 +1,5 @@
 "use strict"
+const { env } = require("./constants")
 const AWS = require("aws-sdk")
 const _ = require("lodash")
 const csvWriter = require("csv-write-stream")
@@ -7,10 +8,13 @@ const fs = require("fs")
 const moment = require("moment")
 const util = require("util")
 
+let region = process.env.AWS_DEFAULT_REGION
+AWS.config.update({ region })
+console.log({ config: AWS.config })
 const cloudwatch = new AWS.CloudWatch()
 const stepfunctions = new AWS.StepFunctions()
+const cloudwatchlogs = new AWS.CloudWatchLogs()
 const bunyan = require("bunyan")
-const { env } = require("./constants")
 
 const log = bunyan.createLogger({ name: "app", level: "debug" })
 
@@ -22,12 +26,21 @@ function _cwId(label) {
   return label.replace(/-/gi, "_")
 }
 
+async function _sleep() {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      log.debug("waiting 1s")
+      resolve()
+    }, 1000)
+  })
+}
+
 function _stepIdFromCwId(label) {
   return label.replace(/_/gi, "-") + "-" + env("FUNCTION_SUFFIX")
 }
 
 function _MemFromCwId(label) {
-  return parseInt(label.split("-").slice(-2, -1))
+  return parseInt(label.split("-").slice(-1))
 }
 
 function writeCsv({ path, data }) {
@@ -49,8 +62,9 @@ async function getStepFunctions({ stateMachineArn, filter }) {
     },
     { stateMachineArn }
   )
-  log.debug({ ctx: "getStepFunctions", params })
+  log.info({ ctx: "getStepFunctions", params })
   let functions = await stepfunctions.listExecutions(params).promise()
+  log.debug({ ctx: "getStepFunctions", functions })
   return _.filter(functions.executions, ent => {
     return ent.name.indexOf(filter) >= 0
   })
@@ -76,6 +90,30 @@ function getStartStop({ functions }) {
     start,
     stop
   }
+}
+
+async function collectDataV2({ startTime, endTime }) {
+  let logGroupName = "/aws/lambda/when-will-i-coldstart-dev-find-idle-timeout"
+  let queryString =
+    " fields @timestamp, coldstarts, interval, target, @message | sort @timestamp desc | limit 500| filter (coldstarts > 0)"
+  const params = {
+    endTime,
+    startTime,
+    logGroupName,
+    queryString
+  }
+  log.info("logs.startQuery", { params })
+  let res = await cloudwatchlogs.startQuery(params).promise()
+  let queryId = res.queryId
+  log.info("logs.getQueryResults", { queryId })
+  res = {
+    status: "Running"
+  }
+  while (res.status === "Running") {
+    res = await cloudwatchlogs.getQueryResults({ queryId }).promise()
+    await _sleep()
+  }
+  return res
 }
 
 // collect data
@@ -122,7 +160,7 @@ function analyzeData({ metricResults, startDate }) {
     ts = moment(ts)
     let min = moment.duration(ts.diff(prev)).as("minutes")
     log.debug({ prev, ts, min })
-    out.push(min)
+    out.push([min, ts])
     prev = ts
   })
   return out
@@ -140,45 +178,25 @@ async function main() {
     filter: suffix
   })
   let { start, stop } = getStartStop({ functions })
-  log.info({ start, stop, functions })
-
-  let MetricDataQueries = functions.map(f => {
-    let { startDate, stopDate, name } = f
-    startDate = _date(startDate).unix()
-    stopDate = _date(stopDate).unix()
+  start = _date(start)
+  stop = _date(stop)
+  log.info({ start, stop })
+  let data = await collectDataV2({
+    startTime: start.unix(),
+    endTime: stop.unix()
+  })
+  let { results } = data
+  results = results.map(u => {
+    let [ts, coldstarts, interval, target] = u.map(v => v.value)
+    log.debug({ u, bond: true, ts, target })
     return {
-      StartTime: startDate,
-      EndTime: stopDate,
-      FunctionValue: name.slice(0, name.indexOf("-" + env("FUNCTION_SUFFIX")))
+      ts,
+      coldstarts,
+      interval,
+      mem: _MemFromCwId(target)
     }
   })
-
-  let data = await collectData({
-    // don't want to count first metric from lambda execution
-    StartTime: start.unix() + 1000,
-    EndTime: stop.unix(),
-    MetricDataQueries
-  })
-  let results = []
-  log.info({ ctx: "collected data", data })
-  data.MetricDataResults.forEach(mr => {
-    let { Id } = mr
-    // id:  when_will_i_coldstart_dev_system_under_test_128
-    // name: "when-will-i-coldstart-dev-system-under-test-128-01292019T0708",
-    Id = _stepIdFromCwId(Id)
-    let { startDate, stopDate } = _.find(functions, { name: Id })
-    let derived = analyzeData({
-      metricResults: mr,
-      startDate: moment(startDate)
-    })
-    // cut 1st result to account for search of initial coldstart
-    derived = derived.slice(1)
-    derived = derived.map(u => {
-      return { name: _MemFromCwId(Id), time: u }
-    })
-    log.info(derived)
-    results = _.concat(results, derived)
-  })
+  log.debug("filtered results", results)
   writeCsv({ path: "/tmp/out.csv", data: results })
   log.info("done")
 }
